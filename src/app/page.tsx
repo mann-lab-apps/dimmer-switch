@@ -2,10 +2,23 @@
 
 import { useState, useEffect, useRef } from "react";
 
+// VAPID 키 변환 헬퍼 함수
+const urlBase64ToUint8Array = (base64String: string) => {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/\-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+};
+
 export default function Home() {
   const [permission, setPermission] = useState<NotificationPermission>("default");
   const [message, setMessage] = useState<string>("");
   const [messageType, setMessageType] = useState<"success" | "error" | "">("");
+  const [isBackgroundPushEnabled, setIsBackgroundPushEnabled] = useState<boolean>(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // 1시간 주기 응원 알림 스케줄러 등록
@@ -94,6 +107,53 @@ export default function Home() {
     }
   };
 
+  // 백그라운드 푸시 토글 핸들러
+  const handleToggleBackgroundPush = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const checked = e.target.checked;
+    setIsBackgroundPushEnabled(checked);
+    
+    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
+      setMessage("백그라운드 푸시를 지원하지 않는 브라우저입니다.");
+      setMessageType("error");
+      setIsBackgroundPushEnabled(false);
+      return;
+    }
+
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      
+      if (checked) {
+        // 실제 테스트용 VAPID 키 (배포 시 환경변수 사용 권장)
+        const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "BHgu5aPshcrPQ-2jjoaT4g-z5zs3VG1imvdctF5WhUx9ubRGCi2HKG19sOhkFwBe0CnBg8eZw0XpWdcGqsc7DHU";
+        const applicationServerKey = urlBase64ToUint8Array(vapidKey);
+        
+        const subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: applicationServerKey,
+        });
+        
+        console.log("=== 백그라운드 푸시 구독 정보 (복사해서 테스트에 사용하세요) ===");
+        console.log(JSON.stringify(subscription));
+        console.log("===============================================================");
+        
+        setMessage("백그라운드 알림이 켜졌습니다 (콘솔 확인)");
+        setMessageType("success");
+      } else {
+        const subscription = await registration.pushManager.getSubscription();
+        if (subscription) {
+          await subscription.unsubscribe();
+        }
+        setMessage("백그라운드 알림이 꺼졌습니다");
+        setMessageType("success");
+      }
+    } catch (error) {
+      console.error("백그라운드 푸시 설정 중 오류:", error);
+      setMessage("설정 중 오류가 발생했습니다.");
+      setMessageType("error");
+      setIsBackgroundPushEnabled(!checked); // 상태 롤백
+    }
+  };
+
   // 헬퍼: 배지 텍스트 및 클래스명 매핑
   const getStatusConfig = () => {
     switch (permission) {
@@ -172,23 +232,53 @@ export default function Home() {
             알림 활성화
           </button>
         ) : (
-          <button className="btn btn-primary" onClick={sendTestNotification}>
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{ marginRight: "4px" }}
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <button className="btn btn-primary" onClick={sendTestNotification}>
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{ marginRight: "4px" }}
+              >
+                <line x1="22" y1="2" x2="11" y2="13" />
+                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+              </svg>
+              즉시 테스트 알림 받기
+            </button>
+
+            {/* 백그라운드 푸시 스위치 UI */}
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "12px 16px",
+                background: "rgba(255, 255, 255, 0.05)",
+                borderRadius: "8px",
+                cursor: "pointer",
+                border: "1px solid rgba(255,255,255,0.1)",
+              }}
             >
-              <line x1="22" y1="2" x2="11" y2="13" />
-              <polygon points="22 2 15 22 11 13 2 9 22 2" />
-            </svg>
-            즉시 테스트 알림 받기
-          </button>
+              <span style={{ fontSize: "15px", fontWeight: "500" }}>백그라운드 푸시</span>
+              <input
+                type="checkbox"
+                checked={isBackgroundPushEnabled}
+                onChange={handleToggleBackgroundPush}
+                aria-label="백그라운드 푸시"
+                style={{
+                  width: "20px",
+                  height: "20px",
+                  accentColor: "#6366f1",
+                  cursor: "pointer",
+                }}
+              />
+            </label>
+          </div>
         )}
 
         {permission === "denied" && (
