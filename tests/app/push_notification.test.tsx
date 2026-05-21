@@ -26,6 +26,12 @@ const mockServiceWorker = {
   }),
 };
 
+// Fetch Mock
+const mockFetch = vi.fn().mockResolvedValue({
+  ok: true,
+  json: () => Promise.resolve({ success: true }),
+});
+
 describe("PWA 웹 푸쉬 / 알림 기능 테스트", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -36,12 +42,14 @@ describe("PWA 웹 푸쉬 / 알림 기능 테스트", () => {
     vi.stubGlobal("navigator", {
       serviceWorker: mockServiceWorker,
     });
+    vi.stubGlobal("fetch", mockFetch);
     mockPermission.value = "default";
     mockRequestPermission.mockClear();
     mockShowNotification.mockClear();
     mockSubscribe.mockClear();
     mockUnsubscribe.mockClear();
     mockGetSubscription.mockClear();
+    mockFetch.mockClear();
   });
 
   afterEach(() => {
@@ -196,6 +204,15 @@ describe("PWA 웹 푸쉬 / 알림 기능 테스트", () => {
       })
     );
 
+    // And 서버 백엔드 API "/api/push/subscribe"로 구독 변경 정보가 전송된다
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/api/push/subscribe",
+      expect.objectContaining({
+        method: "POST",
+        body: expect.any(String),
+      })
+    );
+
     // And 단, 포그라운드 1시간 주기 알림은 스위치 상태와 무관하게 항상 유지된다
     act(() => {
       vi.advanceTimersByTime(60 * 60 * 1000);
@@ -218,6 +235,15 @@ describe("PWA 웹 푸쉬 / 알림 기능 테스트", () => {
     
     // And 서비스 워커의 백그라운드 푸시 구독 해제(unsubscribe) 로직이 호출된다
     expect(mockUnsubscribe).toHaveBeenCalled();
+
+    // And 서버 백엔드 API "/api/push/unsubscribe"로 구독 변경 정보가 전송된다
+    expect(mockFetch).toHaveBeenCalledWith(
+      "/api/push/unsubscribe",
+      expect.objectContaining({
+        method: "POST",
+        body: expect.any(String),
+      })
+    );
 
     // And 단, 포그라운드 1시간 주기 알림은 스위치 상태와 무관하게 항상 유지된다
     act(() => {

@@ -131,16 +131,34 @@ export default function Home() {
           userVisibleOnly: true,
           applicationServerKey: applicationServerKey,
         });
+
+        // 서버 DB에 구독 정보 등록 요청
+        await fetch("/api/push/subscribe", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(subscription),
+        });
         
         console.log("=== 백그라운드 푸시 구독 정보 (복사해서 테스트에 사용하세요) ===");
         console.log(JSON.stringify(subscription));
         console.log("===============================================================");
         
-        setMessage("백그라운드 알림이 켜졌습니다 (콘솔 확인)");
+        setMessage("백그라운드 알림이 켜졌습니다");
         setMessageType("success");
       } else {
         const subscription = await registration.pushManager.getSubscription();
         if (subscription) {
+          // 서버 DB에서 구독 정보 삭제 요청
+          await fetch("/api/push/unsubscribe", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(subscription),
+          });
+
           await subscription.unsubscribe();
         }
         setMessage("백그라운드 알림이 꺼졌습니다");

@@ -16,9 +16,11 @@
 |:----|:---------|:----------------------|:--------|:---------|:-------|:----------|
 | F01 | 알림 | 알림 권한 요청 및 상태 표시 | P01 | P0 | Done | `tests/app/push_notification.test.tsx` |
 | F02 | 알림 | 즉시 테스트 알림 발송 ("화이팅 만마에!") | P01 | P0 | Done | `tests/app/push_notification.test.tsx` |
-| F03 | 알림 | 1시간 주기 응원 알림 스케줄링 | P01 | P0 | Done | `tests/app/push_notification.test.tsx` |
-| F04 | 알림 | 백그라운드 푸시 켜기/끄기 스위치 UI 제공 | P01 | P0 | Done | `tests/app/push_notification.test.tsx` |
+| F03 | 알림 | 1시간 주기 응원 알림 스케줄링 | P01 | P0 | WIP | `tests/app/push_notification.test.tsx` |
+| F04 | 알림 | 백그라운드 푸시 켜기/끄기 스위치 UI 제공 | P01 | P0 | WIP | `tests/app/push_notification.test.tsx` |
 | F05 | 알림 | 서비스 워커 백그라운드 푸시 이벤트 수신 및 처리 | P01 | P0 | Done | `tests/sw/push_notification.test.ts` |
+| F06 | 알림 | 백엔드 웹 푸시 구독 등록 및 해제 API | P01 | P0 | WIP | `tests/app/backend_push.test.ts` |
+| F07 | 알림 | 매 정각 백엔드 푸시 스케줄러 발송 API | P01 | P0 | WIP | `tests/app/backend_push.test.ts` |
 
 > **Status 속성 가이드:**
 > - `Pending`: 작업 전

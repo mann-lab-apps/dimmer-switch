@@ -35,16 +35,24 @@ Feature: PWA 웹 푸쉬 / 알림 기능
     Given 알림 권한 상태가 "granted" 이다
     When  사용자가 "백그라운드 푸시" 스위치를 "<Action>"으로 토글한다
     Then  백그라운드 푸시 설정이 "<State>" 상태로 변경된다
+    And   서버 백엔드 API "<API>"로 구독 변경 정보가 전송된다
     And   "<Message>" 메시지가 표시된다
     And   단, 포그라운드 1시간 주기 알림은 스위치 상태와 무관하게 항상 유지된다
 
     Examples:
-      | Action | State    | Message                      |
-      | On     | 활성화   | 백그라운드 알림이 켜졌습니다 |
-      | Off    | 비활성화 | 백그라운드 알림이 꺼졌습니다 |
+      | Action | State    | API                    | Message                      |
+      | On     | 활성화   | /api/push/subscribe   | 백그라운드 알림이 켜졌습니다 |
+      | Off    | 비활성화 | /api/push/unsubscribe | 백그라운드 알림이 꺼졌습니다 |
 
   Scenario: 앱이 백그라운드 상태일 때 푸시 이벤트 수신 및 알림 노출 (Service Worker)
     Given 알림 권한 상태가 "granted" 이고 백그라운드 푸시가 활성화되어 있다
     And   앱이 종료되었거나 백그라운드 상태에 있다
     When  푸시 서버로부터 서비스 워커로 "push" 이벤트가 도착한다
     Then  서비스 워커는 시스템에 "화이팅 만마에!" 내용의 알림 카드 노출을 요청한다
+
+  Scenario: 매 정각 1시간 주기 백그라운드 푸시 스케줄링 발송 및 실패 구독 정리 (Cron)
+    Given 데이터베이스에 구독 정보 목록이 저장되어 있다
+    And   그 중 만료되거나 유효하지 않은 구독 정보가 포함되어 있다
+    When  매 정각 배치 크론이 헤더 토큰과 함께 "/api/push/send-hourly"를 호출한다
+    Then  서버는 모든 유효한 구독 기기로 웹 푸시 알림을 발송한다
+    And   만료되거나 유효하지 않은 구독 정보는 데이터베이스에서 삭제(정리)된다

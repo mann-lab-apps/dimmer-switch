@@ -24,9 +24,9 @@ flowchart TD
     B -- 이미 허용됨 --> E
     E --> K[포그라운드 1시간 스케줄러 기본 활성화]
     K --> I[백그라운드 푸시 스위치 UI 노출]
-    I -- 스위치 ON --> G[백그라운드 스케줄러 활성화]
-    I -- 스위치 OFF --> J[백그라운드 스케줄러 비활성화]
-    G --> H[앱 종료 시에도 백그라운드에서 알림 발송]
+    I -- 스위치 ON --> G[푸시 구독 생성 및 서버 DB 등록]
+    I -- 스위치 OFF --> J[푸시 구독 해제 및 서버 DB에서 삭제]
+    G --> H[앱 종료 시에도 매시 정각 크론이 서버에서 웹 푸시 발송]
     J --> L[앱 실행 중에만 포그라운드 알림 발송 유지]
 ```
 
@@ -35,27 +35,42 @@ flowchart TD
 sequenceDiagram
     participant User as 사용자
     participant Front as 프론트엔드 (Next.js)
+    participant Server as 백엔드 API (Route Handlers)
+    participant DB as 데이터베이스 (Redis)
+    participant Cron as HTTP Cron 스케줄러
     participant SW as 서비스 워커 (Service Worker)
     participant OS as 브라우저/OS 알림 시스템
     
     User->>Front: 알림 권한 허용
     Front->>Front: 포그라운드 1시간 스케줄러 등록
     Front->>User: 백그라운드 푸시 스위치 노출
-    User->>Front: 스위치 ON 토글
-    Front->>SW: 서비스 워커 스케줄러/푸시 구독 등록
     
+    %% 백그라운드 푸시 On
+    User->>Front: 스위치 ON 토글
+    Front->>SW: pushManager.subscribe() 호출
+    SW->>Front: 구독 정보 객체 (Subscription) 반환
+    Front->>Server: POST /api/push/subscribe (구독 정보 전송)
+    Server->>DB: 구독 정보 저장
+    Front->>User: "백그라운드 알림이 켜졌습니다" 표시
+
     alt 포그라운드 상태 (스위치 무관)
-        Note over Front: 1시간 간격 발생
+        Note over Front: 1시간 간격 발생 (앱 실행 중)
         Front->>OS: showNotification("화이팅 만마에!") 호출
         OS->>User: 알림 카드 노출
-    else 스위치 ON & 백그라운드 상태
-        Note over SW: 푸시 서버로부터 알림 수신
-        SW->>SW: push 이벤트 트리거
-        SW->>OS: showNotification("화이팅 만마에!") 호출
-        OS->>User: 알림 카드 노출 ("화이팅 만마에!")
+    else 백그라운드 / 앱 종료 상태 (스위치 ON)
+        Note over Cron: 매시 정각 호출 주기 도달
+        Cron->>Server: POST /api/push/send-hourly (토큰 인증)
+        Server->>DB: 전체 구독 정보 목록 조회
+        DB-->>Server: 구독 목록 반환
+        loop 각 구독 대상
+            Server->>SW: Web Push 발송 (Push Service 경유)
+            SW->>SW: push 이벤트 트리거 (기기 백그라운드)
+            SW->>OS: showNotification("화이팅 만마에!") 호출
+            OS->>User: 알림 카드 노출
+        end
     end
 ```
 
 ## 📝 BDD 시나리오 참조
 구체적인 동작 명세(Given/When/Then)는 다음 파일을 참조하십시오:
-- [docs/user-flow/push_notification.feature](file:///Users/gimjaeman/Desktop/coding/mannlab/dimmer-switch/docs/user-flow/push_notification.feature)
+- [docs/user-flow/push_notification.feature](file:///Users/jaemankim/Desktop/privates/coding/dimmer-switch/docs/user-flow/push_notification.feature)
