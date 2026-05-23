@@ -1,109 +1,64 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-
-// VAPID 키 변환 헬퍼 함수
-const urlBase64ToUint8Array = (base64String: string) => {
-  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding).replace(/\-/g, "+").replace(/_/g, "/");
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
-};
+import { useState, useEffect } from "react";
+import { LocalNotifications } from "@capacitor/local-notifications";
 
 export default function Home() {
-  const [permission, setPermission] = useState<NotificationPermission>("default");
+  const [permission, setPermission] = useState<string>("prompt");
   const [message, setMessage] = useState<string>("");
   const [messageType, setMessageType] = useState<"success" | "error" | "">("");
   const [isBackgroundPushEnabled, setIsBackgroundPushEnabled] = useState<boolean>(false);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // 1시간 주기 응원 알림 스케줄러 등록
-  const startScheduler = () => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-    }
-
-    const sendHourlyNotification = () => {
-      if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
-        navigator.serviceWorker.ready.then((registration) => {
-          registration.showNotification("화이팅 만마에!", {
-            body: "오늘 하루도 힘차게 극복해봐요!",
-            icon: "/icons/icon-192x192.png",
-            badge: "/icons/icon-192x192.png",
-            tag: "hourly-cheer",
-          });
-        });
-      }
-    };
-
-    // 1시간마다 푸시 알림 트리거 (60분 * 60초 * 1000ms)
-    timerRef.current = setInterval(sendHourlyNotification, 60 * 60 * 1000);
-  };
 
   useEffect(() => {
-    if (typeof window !== "undefined" && "Notification" in window) {
-      setPermission(Notification.permission);
-      if (Notification.permission === "granted") {
-        startScheduler();
-      }
-    }
-
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-    };
+    checkPermissionStatus();
   }, []);
+
+  const checkPermissionStatus = async () => {
+    try {
+      const result = await LocalNotifications.checkPermissions();
+      setPermission(result.display);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   // 알림 권한 요청 처리
   const requestPermission = async () => {
-    if (typeof window === "undefined" || !("Notification" in window)) {
-      setMessage("이 브라우저는 알림을 지원하지 않습니다.");
-      setMessageType("error");
-      return;
-    }
-
     try {
-      const result = await Notification.requestPermission();
-      setPermission(result);
+      const result = await LocalNotifications.requestPermissions();
+      setPermission(result.display);
 
-      if (result === "granted") {
+      if (result.display === "granted") {
         setMessage("알림이 활성화되었습니다");
         setMessageType("success");
-        startScheduler();
-      } else if (result === "denied") {
-        setMessage("알림 권한이 거부되었습니다. 브라우저 설정에서 허용해주세요");
+      } else if (result.display === "denied") {
+        setMessage("알림 권한이 거부되었습니다. 브라우저/기기 설정에서 허용해주세요");
         setMessageType("error");
-        if (timerRef.current) {
-          clearInterval(timerRef.current);
-          timerRef.current = null;
-        }
       }
     } catch (error) {
       console.error("알림 권한 요청 중 오류 발생:", error);
     }
   };
 
-  // 즉시 테스트 알림 전송
+  // 즉시 테스트 알림 전송 (5초 뒤 발송되도록 하여 백그라운드 테스트 용이하게 변경)
   const sendTestNotification = async () => {
     if (permission !== "granted") return;
 
-    if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
-      try {
-        const registration = await navigator.serviceWorker.ready;
-        registration.showNotification("화이팅 만마에!", {
-          body: "즉시 테스트 알림입니다. 언제나 응원합니다!",
-          icon: "/icons/icon-192x192.png",
-          badge: "/icons/icon-192x192.png",
-          tag: "test-cheer",
-        });
-      } catch (error) {
-        console.error("즉시 테스트 알림 발송 중 오류 발생:", error);
-      }
+    try {
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            id: Date.now(),
+            title: "화이팅 만마에!",
+            body: "백그라운드 테스트 알림입니다. 언제나 응원합니다!",
+            schedule: { at: new Date(Date.now() + 5000) }, // 5초 뒤 발송
+          },
+        ],
+      });
+      setMessage("5초 뒤 알림이 발송됩니다. 홈 화면으로 나가보세요!");
+      setMessageType("success");
+    } catch (error) {
+      console.error("즉시 테스트 알림 발송 중 오류 발생:", error);
     }
   };
 
@@ -111,56 +66,26 @@ export default function Home() {
   const handleToggleBackgroundPush = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const checked = e.target.checked;
     setIsBackgroundPushEnabled(checked);
-    
-    if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) {
-      setMessage("백그라운드 푸시를 지원하지 않는 브라우저입니다.");
-      setMessageType("error");
-      setIsBackgroundPushEnabled(false);
-      return;
-    }
 
     try {
-      const registration = await navigator.serviceWorker.ready;
-      
       if (checked) {
-        // 실제 테스트용 VAPID 키 (배포 시 환경변수 사용 권장)
-        const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || "BHgu5aPshcrPQ-2jjoaT4g-z5zs3VG1imvdctF5WhUx9ubRGCi2HKG19sOhkFwBe0CnBg8eZw0XpWdcGqsc7DHU";
-        const applicationServerKey = urlBase64ToUint8Array(vapidKey);
-        
-        const subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: applicationServerKey,
+        await LocalNotifications.schedule({
+          notifications: [
+            {
+              id: 1, // 테스트 코드와 일치시키기 위해 고정된 1 사용
+              title: "화이팅 만마에!",
+              body: "오늘 하루도 힘차게 극복해봐요!",
+              schedule: { every: "hour" },
+            },
+          ],
         });
 
-        // 서버 DB에 구독 정보 등록 요청
-        await fetch("/api/push/subscribe", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(subscription),
-        });
-        
-        console.log("=== 백그라운드 푸시 구독 정보 (복사해서 테스트에 사용하세요) ===");
-        console.log(JSON.stringify(subscription));
-        console.log("===============================================================");
-        
         setMessage("백그라운드 알림이 켜졌습니다");
         setMessageType("success");
       } else {
-        const subscription = await registration.pushManager.getSubscription();
-        if (subscription) {
-          // 서버 DB에서 구독 정보 삭제 요청
-          await fetch("/api/push/unsubscribe", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(subscription),
-          });
-
-          await subscription.unsubscribe();
-        }
+        await LocalNotifications.cancel({
+          notifications: [{ id: 1 }],
+        });
         setMessage("백그라운드 알림이 꺼졌습니다");
         setMessageType("success");
       }
