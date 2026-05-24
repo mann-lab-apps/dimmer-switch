@@ -15,10 +15,12 @@
 | ID  | Category | Feature (Requirement) | Page ID | Priority | Status | Test Case |
 |:----|:---------|:----------------------|:--------|:---------|:-------|:----------|
 | F01 | 알림 | 알림 권한 요청 및 상태 표시 | P01 | P0 | Done | `tests/app/push_notification.test.tsx` |
-| F02 | 알림 | 즉시 테스트 알림 발송 ("화이팅 만마에!") | P01 | P0 | Done | `tests/app/push_notification.test.tsx` |
+| F02 | 알림 | 즉시 응원 알림 받기 (등록 메시지 없을 시 기본 메시지, 있을 시 기본+등록 메시지 중 랜덤 발송) | P01 | P0 | Done | `tests/app/push_notification.test.tsx` |
 | F03 | 알림 | 1시간 주기 응원 알림 스케줄링 (포그라운드/백그라운드 통합) | P01 | P0 | Done | `tests/app/push_notification.test.tsx` |
 | F04 | 알림 | 백그라운드 푸시 켜기/끄기 스위치 UI 제공 | P01 | P0 | Done | `tests/app/push_notification.test.tsx` |
 | F05 | 알림 | Capacitor Local Notifications 기반 스케줄링 및 권한 제어 | P01 | P0 | Done | `tests/app/push_notification.test.tsx` |
+| F06 | 알림 | 응원 메시지 등록 및 목록 관리 (추가 및 삭제) | P01 | P0 | Done | `tests/app/push_notification.test.tsx` |
+
 
 > **Status 속성 가이드:**
 > - `Pending`: 작업 전
